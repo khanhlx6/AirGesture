@@ -96,6 +96,28 @@ else
   echo "==> SKIP_PIPER=1: demo falls back to the Web Speech voice (Miko voice option hidden)"
 fi
 
+# Point the demo's "Created with Mesh Avatar Studio" link at OUR landing page,
+# and its source link at the fork we actually built from.
+PUBLISHED_URL="$PUBLISHED_URL" AITUBER_REPO="$AITUBER_REPO" python3 - <<'PY'
+import os, pathlib, re
+
+app = pathlib.Path('demo/mesh-avatar-chat/src/App.tsx')
+text = app.read_text()
+published = os.environ['PUBLISHED_URL'].rstrip('/') + '/'
+repo = 'https://github.com/' + os.environ['AITUBER_REPO']
+text = re.sub(
+    r"const STUDIO_URL = 'https://[^']+';",
+    f"const STUDIO_URL = '{published}';",
+    text,
+)
+text = re.sub(
+    r"const REPO_URL = 'https://github.com/[^']+';",
+    f"const REPO_URL = '{repo}';",
+    text,
+)
+app.write_text(text)
+PY
+
 VITE_BASE_PATH="$DEMO_BASE" npm --prefix demo/mesh-avatar-chat run build
 
 # ---------------------------------------------------------------------------
@@ -195,6 +217,12 @@ cat > "$OUT/404.html" <<'HTML'
 <body><p>Page not found. <a href="./">Back to Mesh Avatar Studio</a> &middot;
 <a href="./mesh-avatar-chat/">Open Mesh Avatar Chat</a></p></body></html>
 HTML
+
+# Intermediate checkouts contain ~1 GB of node_modules. Keep the site only,
+# unless KEEP_SOURCES=1 is set for debugging.
+if [ "${KEEP_SOURCES:-0}" != "1" ]; then
+  rm -rf "$SRC"
+fi
 
 echo "==> Done: $(du -sh "$OUT" | cut -f1) in $OUT"
 echo "    Landing page : ${OUT}/index.html"
