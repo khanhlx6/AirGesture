@@ -1,0 +1,95 @@
+# One-click publishing of the Pages deploy kit to the target fork.
+#
+# The GitHub App token available to this workspace can only write to
+# khanhlx6/AirGesture, so this workflow uses a Personal Access Token supplied
+# by the user as the secret PAGES_DEPLOY_TOKEN. Once it runs, the target repo
+# owns its own .github/workflows/pages.yml and deploys itself.
+name: Publish Pages deploy kit to aituber-onair fork
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_repo:
+        description: 'owner/repo to publish the deploy kit to'
+        required: true
+        default: khanhlx6/aituber-onair
+      trigger_deploy:
+        description: 'Run the Pages workflow on the target repo after pushing'
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.PAGES_DEPLOY_TOKEN }}
+      TARGET_REPO: ${{ inputs.target_repo }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the deploy token
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::error::Add a repository secret named PAGES_DEPLOY_TOKEN (PAT with repo scope)." >&2
+            exit 1
+          fi
+          gh auth status
+
+      - name: Clone the target repository
+        run: |
+          git clone "https://x-access-token:${GH_TOKEN}@github.com/${TARGET_REPO}.git" "$RUNNER_TEMP/target"
+          git -C "$RUNNER_TEMP/target" config user.name "github-actions[bot]"
+          git -C "$RUNNER_TEMP/target" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Copy the deploy kit
+        run: |
+          target="$RUNNER_TEMP/target"
+          mkdir -p "$target/.github/workflows" "$target/scripts" "$target/docs"
+          cp .github/workflows/pages.yml "$target/.github/workflows/pages.yml"
+          cp scripts/build-site.sh scripts/verify-piper-assets.sh "$target/scripts/"
+          cp docs/DEPLOY.md "$target/docs/DEPLOY.md"
+          # Append our ignores without clobbering the upstream repo's own file.
+          touch "$target/.gitignore"
+          for entry in '/build/' '/.preview/'; do
+            grep -qxF "$entry" "$target/.gitignore" || echo "$entry" >> "$target/.gitignore"
+          done
+          chmod +x "$target/scripts/build-site.sh" "$target/scripts/verify-piper-assets.sh"
+
+      - name: Enable GitHub Pages (GitHub Actions source)
+        run: |
+          if gh api "repos/${TARGET_REPO}/pages" >/dev/null 2>&1; then
+            gh api -X PUT "repos/${TARGET_REPO}/pages" \
+              -f build_type=workflow -f 'source[branch]=main' -f 'source[path]=/' \
+              || echo "Pages already configured; keeping the existing settings."
+          else
+            gh api -X POST "repos/${TARGET_REPO}/pages" \
+              -f build_type=workflow -f 'source[branch]=main' -f 'source[path]=/'
+          fi
+
+      - name: Commit and push
+        run: |
+          target="$RUNNER_TEMP/target"
+          git -C "$target" add -A
+          if git -C "$target" diff --cached --quiet; then
+            echo "Deploy kit is already up to date."
+          else
+            git -C "$target" commit -m "chore: deploy Mesh Avatar Studio + Mesh Avatar Chat to GitHub Pages"
+            git -C "$target" push origin main
+          fi
+
+      - name: Trigger the Pages deployment
+        if: ${{ inputs.trigger_deploy }}
+        run: gh workflow run pages.yml -R "$TARGET_REPO" --ref main
+
+      - name: Summary
+        run: |
+          owner="${TARGET_REPO%%/*}"
+          repo="${TARGET_REPO##*/}"
+          echo "### Deploy kit published" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Landing page: https://${owner}.github.io/${repo}/" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Chat demo: https://${owner}.github.io/${repo}/mesh-avatar-chat/" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Actions: https://github.com/${TARGET_REPO}/actions/workflows/pages.yml" >> "$GITHUB_STEP_SUMMARY"

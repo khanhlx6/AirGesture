@@ -1,0 +1,85 @@
+# Adapted from khanhlx6/aituber-onair/.github/workflows/pages.yml and
+# shinshin86/mesh-avatar-studio/.github/workflows/pages.yml.
+#
+# Publishes ONE Pages site that contains:
+#   /                     Mesh Avatar Studio landing page
+#   /mesh-avatar-chat/    AITuber OnAir "Mesh Avatar Chat" demo (Miko)
+#
+# Drop this file (together with scripts/ and docs/) into the repo whose
+# GitHub Pages site you want to publish. Works in any public repo: the base
+# path is derived from github.event.repository.name.
+name: Deploy Studio + Mesh Avatar Chat to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/**'
+      - 'docs/DEPLOY.md'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+    inputs:
+      skip_piper:
+        description: 'Skip the ~150 MB piper-plus assets (Web Speech voice only)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+env:
+  SITE_BASE: /${{ github.event.repository.name }}/
+  PUBLISHED_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
+  AITUBER_REPO: khanhlx6/aituber-onair
+  AITUBER_REF: main
+  STUDIO_REPO: shinshin86/mesh-avatar-studio
+  STUDIO_REF: main
+  # Runtime + OpenJTalk dictionary (optional override through a repo variable).
+  PIPER_ASSETS_URL: ${{ vars.PIPER_ASSETS_URL || 'https://github.com/shinshin86/chrome-on-aituber/releases/download/piper-assets-v2/piper-assets.tar.gz' }}
+  # Miko's sample-voice-v2 files. Pinned HF revision found in
+  # shinshin86/chrome-on-aituber/scripts/piper/fetch-miko-voice.sh
+  PIPER_MODEL_BASE_URL: ${{ vars.PIPER_MODEL_BASE_URL || 'https://huggingface.co/shinshin86/aituber-onair-miko-voice-piper-plus/resolve/b7db1788bcab3ccaec6d3b541ba6195edab48e1f' }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Build combined site
+        env:
+          SKIP_PIPER: ${{ inputs.skip_piper && '1' || '0' }}
+          GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
+        run: bash scripts/build-site.sh
+
+      # If Pages is not enabled yet, set the optional PAGES_DEPLOY_TOKEN secret
+      # (classic PAT with repo scope) so configure-pages can enable it for us.
+      # Otherwise enable it once in Settings -> Pages -> Source: GitHub Actions.
+      - uses: actions/configure-pages@v5
+        with:
+          token: ${{ secrets.PAGES_DEPLOY_TOKEN || github.token }}
+          enablement: ${{ secrets.PAGES_DEPLOY_TOKEN != '' && 'true' || 'false' }}
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

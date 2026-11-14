@@ -61,3 +61,15 @@ Here is the mapping between your gesture and dinosaur's action:
 * **gym_chrome_dino**
 * **pygame**
 * **opencv**
+
+---
+
+## GitHub Pages deploy kit (Mesh Avatar Studio + Mesh Avatar Chat)
+
+This branch also contains a ready-to-run GitHub Pages deployment kit adapted
+from [`khanhlx6/aituber-onair/.github/workflows`](https://github.com/khanhlx6/aituber-onair/tree/main/.github/workflows):
+`.github/workflows/pages.yml` builds a combined site (Mesh Avatar Studio landing
+page at `/` and the AITuber OnAir Mesh Avatar Chat demo at `/mesh-avatar-chat/`),
+including Miko's pinned piper-plus voice model. See
+[`docs/DEPLOY.md`](docs/DEPLOY.md) for the one-command publish steps, the model
+URL/hashes, and the local preview command.
