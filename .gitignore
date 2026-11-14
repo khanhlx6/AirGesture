@@ -1,0 +1,10 @@
+# Generated Pages build output (scripts/build-site.sh)
+/build/
+/.preview/
+
+# Node / Python scratch
+node_modules/
+dist/
+*.log
+__pycache__/
+.DS_Store
