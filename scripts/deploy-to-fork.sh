@@ -37,7 +37,11 @@ mkdir -p "$TMP/target/.github/workflows" "$TMP/target/scripts" "$TMP/target/docs
 cp "$ROOT/.github/workflows/pages.yml" "$TMP/target/.github/workflows/pages.yml"
 cp "$ROOT/scripts/build-site.sh" "$ROOT/scripts/verify-piper-assets.sh" "$TMP/target/scripts/"
 cp "$ROOT/docs/DEPLOY.md" "$TMP/target/docs/DEPLOY.md"
-[ -f "$ROOT/.gitignore" ] && cp "$ROOT/.gitignore" "$TMP/target/.gitignore"
+# Append our ignores without clobbering the target repo's own .gitignore.
+touch "$TMP/target/.gitignore"
+for entry in '/build/' '/.preview/'; do
+  grep -qxF "$entry" "$TMP/target/.gitignore" || echo "$entry" >> "$TMP/target/.gitignore"
+done
 chmod +x "$TMP/target/scripts/build-site.sh" "$TMP/target/scripts/verify-piper-assets.sh"
 
 echo "==> Enabling GitHub Pages (GitHub Actions source)"

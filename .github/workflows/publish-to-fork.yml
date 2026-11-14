@@ -51,7 +51,11 @@ jobs:
           cp .github/workflows/pages.yml "$target/.github/workflows/pages.yml"
           cp scripts/build-site.sh scripts/verify-piper-assets.sh "$target/scripts/"
           cp docs/DEPLOY.md "$target/docs/DEPLOY.md"
-          cp .gitignore "$target/.gitignore" 2>/dev/null || true
+          # Append our ignores without clobbering the upstream repo's own file.
+          touch "$target/.gitignore"
+          for entry in '/build/' '/.preview/'; do
+            grep -qxF "$entry" "$target/.gitignore" || echo "$entry" >> "$target/.gitignore"
+          done
           chmod +x "$target/scripts/build-site.sh" "$target/scripts/verify-piper-assets.sh"
 
       - name: Enable GitHub Pages (GitHub Actions source)

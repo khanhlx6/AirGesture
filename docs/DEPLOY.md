@@ -42,7 +42,8 @@ Yêu cầu: đã `gh auth login` bằng tài khoản có quyền **push** lên r
 
 1. clone repo đích,
 2. copy `.github/workflows/pages.yml`, `scripts/build-site.sh`,
-   `scripts/verify-piper-assets.sh`, `docs/DEPLOY.md`, `.gitignore`,
+   `scripts/verify-piper-assets.sh`, `docs/DEPLOY.md` và nối thêm
+   `/build/` vào `.gitignore` của repo đích,
 3. bật **Settings → Pages → Source: GitHub Actions** qua API,
 4. commit + push lên `main`,
 5. `gh workflow run pages.yml` để deploy ngay.
@@ -70,6 +71,8 @@ scripts/build-site.sh
 scripts/verify-piper-assets.sh
 docs/DEPLOY.md
 ```
+
+Nhớ thêm dòng `/build/` vào `.gitignore` của repo đích.
 
 Nếu Pages chưa được bật và bạn không muốn dùng PAT, bật tay một lần:
 **Settings → Pages → Build and deployment → Source = GitHub Actions**.
