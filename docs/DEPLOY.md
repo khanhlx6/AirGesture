@@ -150,3 +150,69 @@ lại (`ci.yml`, `release.yml`, `prerelease-next.yml`, `create-template-smoke.ym
 `biome-config.yml`, `chat-openai-compat.yml`,
 `agent-stream-operations-staff.yml`) là CI/publishing của chính monorepo
 TypeScript đó, nên không copy sang đây để tránh chạy nhầm trên repo Python này.
+
+## Sửa job `prerelease-next` bị đỏ trong repo fork
+
+Trong repo fork `khanhlx6/aituber-onair`, job **prerelease-next** hay fail với:
+
+```
+fatal: No names found, cannot describe anything.
+Error: Process completed with exit code 128.
+```
+
+**Nguyên nhân:** GitHub **không copy git tag** khi bạn fork một repository, nên
+fork bắt đầu với `0` tag (repo gốc `shinshin86/aituber-onair` có 246 tag). Bước
+đầu tiên của `.github/workflows/prerelease-next.yml` là:
+
+```bash
+last_tag=$(git describe --tags --abbrev=0 \
+           $(git rev-list --tags --no-walk --exclude='next' --exclude='*-rc*' --max-count=1))
+```
+
+Khi fork không có tag nào, `git rev-list --tags` không in ra gì, nên
+`git describe --tags --abbrev=0` được gọi **không có tham số** → fail với exit
+code 128. Lỗi này **không ảnh hưởng** tới bước deploy Pages (job
+*Deploy demo to GitHub Pages* vẫn xanh), nó chỉ làm tab Actions có dấu đỏ.
+
+**Cách sửa (khuyên dùng): đồng bộ tag từ upstream vào fork**
+
+```bash
+# xem trước sẽ push những tag nào (không thay đổi gì)
+bash scripts/fix-fork-tags.sh
+
+# push thật (cần token có quyền contents:write trên khanhlx6/aituber-onair)
+APPLY=1 bash scripts/fix-fork-tags.sh
+
+# fork khác thì đổi target:
+APPLY=1 FORK_REPO=owner/repo bash scripts/fix-fork-tags.sh
+```
+
+Script sẽ fetch toàn bộ tag của `shinshin86/aituber-onair` rồi chỉ push những tag
+fork còn thiếu (bỏ qua tag `next` vì đó là tag "nightly" di động do chính workflow
+quản lý; muốn copy luôn thì đặt `INCLUDE_NIGHTLY=1`). Script chạy lại nhiều lần
+vẫn an toàn (idempotent) và không sửa file nào trong fork — nên việc merge
+`shinshin86:main` vào `main` sau này không bị conflict.
+
+Sau đó chạy lại job đã fail:
+
+```bash
+gh run rerun 45405131269 -R khanhlx6/aituber-onair
+```
+
+**Cách khác: tắt hẳn workflow nightly trong fork** (nếu bạn không cần bản
+prerelease `next` cho fork của mình)
+
+```bash
+# cần token có quyền actions:write (PAT của bạn, không phải GITHUB_TOKEN)
+gh api -X PUT repos/khanhlx6/aituber-onair/actions/workflows/prerelease-next.yml/disable
+# bật lại:
+gh api -X PUT repos/khanhlx6/aituber-onair/actions/workflows/prerelease-next.yml/enable
+```
+
+Hoặc vào **Settings → Actions → General** / tab **Actions** → chọn
+`prerelease-next` → **Disable workflow** (không cần token). Cách này giữ fork
+sạch tuyệt đối nhưng bạn sẽ không có nightly prerelease.
+
+> Ghi chú: token tích hợp của Arena hiện chỉ đọc được metadata của
+> `khanhlx6/aituber-onair` (mọi lệnh ghi như `git push`, sửa file, `PUT /actions/...`
+> đều trả 403), nên hai lệnh trên cần chạy bằng `gh`/PAT của chính bạn.

@@ -73,3 +73,9 @@ page at `/` and the AITuber OnAir Mesh Avatar Chat demo at `/mesh-avatar-chat/`)
 including Miko's pinned piper-plus voice model. See
 [`docs/DEPLOY.md`](docs/DEPLOY.md) for the one-command publish steps, the model
 URL/hashes, and the local preview command.
+
+If the fork's `prerelease-next` job fails with
+`fatal: No names found, cannot describe anything.`, that is because forks do not
+inherit git tags. `bash scripts/fix-fork-tags.sh` reports the missing tags and
+`APPLY=1 bash scripts/fix-fork-tags.sh` syncs them from upstream (see
+[the troubleshooting section](docs/DEPLOY.md#sửa-job-prerelease-next-bị-đỏ-trong-repo-fork)).
